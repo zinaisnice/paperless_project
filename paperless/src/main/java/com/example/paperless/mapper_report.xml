@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.paperless.ReportDAO">
+   
+   <sql id="reportFrom">
+      <if test="report_code == 1">
+         daily_report
+      </if>
+      <if test="report_code == 2">
+         expense_report
+      </if>
+      <if test="report_code == 3">
+         sales_report
+      </if>
+      <if test="report_code == 4">
+         vacation_report
+      </if>
+   </sql>
+   
+   <sql id="reportWhere">
+      
+      1=1
+      
+      <if test="keyword != null and keyword.length() > 0">
+         and (
+            upper(<include refid="reportFrom"/>.title) like upper('%${keyword}%')
+            or
+            upper(employee.name) like upper('%${keyword}%')
+         )
+      </if>
+      
+      <if test="min_year != null and min_year.length() > 0 and min_month != null and min_month.length() > 0">
+         
+         <if test="report_code != 2">
+            and to_char(start_date, 'YYYYMM') &gt;= '${min_year}' || '${min_month}'
+         </if>
+         <if test="report_code == 2">
+            and to_char(expense_date, 'YYYYMM') &gt;= '${min_year}' || '${min_month}'
+         </if>
+         
+      </if>
+      
+      <if test="max_year != null and max_year.length() > 0 and max_month != null and max_month.length() > 0">
+         
+         <if test="report_code != 2">
+            and to_char(start_date, 'YYYYMM') &lt;= '${max_year}' || '${max_month}'
+         </if>
+         <if test="report_code == 2">
+            and to_char(expense_date, 'YYYYMM') &lt;= '${max_year}' || '${max_month}'
+         </if>
+         
+      </if>
+      
+      <if test="approval != null">
+         <foreach collection="approval" item="xxx" open="and (" close=")" separator="or">
+         
+            <include refid="reportFrom"/>.approval_code = ${xxx}
+         
+         </foreach>
+      </if>
+      
+      <if test="type != null">
+         <foreach collection="type" item="xxx" open="and (" close=")" separator="or">
+         
+            <include refid="reportFrom"/>.type_code = ${xxx}
+         
+         </foreach>
+      </if>
+      
+   </sql>
+   
+   
+   <!-- 상급자 목록 반환 -->
+   <select id="getSuperiorList" parameterType="int" resultType="java.util.HashMap">
+   
+      select approval_line.emp_no as "emp_no" 
+          , employee.name as "name"
+          , jikup.jikup_name as "jikup"
+          , approval_line.line_no as "line_no"
+      from approval_line, employee, jikup
+      where approval_line.approval_line_no in (
+         select approval_line.approval_line_no - 1 from approval_line
+         where approval_line.emp_no = ${emp_no}
+      )
+      and approval_line.company_code = (select company_code from employee where emp_no = ${emp_no})
+      and employee.emp_no = approval_line.emp_no
+      and jikup.jikup_code = employee.jikup_code
+         
+   </select>
+   
+   <!-- 보고서 작성자가 선택한 결재라인의 상급자 반환 -->
+   <select id="getSuperior" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+      
+      select approval_line.emp_no as "emp_no" 
+          , employee.name as "name"
+          , jikup.jikup_name as "jikup"
+          , approval_line.line_no as "line_no"
+      from approval_line, employee, jikup
+      where approval_line.approval_line_no = (select approval_line_no from approval_line where line_no = ${approval_line}
+         and line_order = (select line_order - 1 from approval_line where emp_no = ${emp_no} and line_no = ${approval_line})
+         and approval_line.company_code = (select company_code from employee where emp_no = ${emp_no}))
+      and employee.emp_no = approval_line.emp_no
+      and jikup.jikup_code = employee.jikup_code
+      and approval_line.company_code = (select company_code from employee where emp_no = ${emp_no})
+         
+   </select>
+   
+   
+   
+   <!--  reportList.do -->
+   <!-- 검색한 보고서 목록 반환 -->
+   <select id="getReportList" parameterType="com.example.paperless.ReportSearchDTO" resultType="java.util.HashMap">
+   
+      select * from (select rownum RNUM, zxcvb.* from( 
+         select <include refid="reportFrom"/>.r_no as "r_no"
+            , <include refid="reportFrom"/>.report_no as "report_no"
+            , employee.name as "emp_name" 
+            , employee.img as "emp_img"
+            , jikup.jikup_name as "jikup_name" 
+            , report_type_code.type_name as "type_name"
+            , <include refid="reportFrom"/>.title as "title"
+            , approval.resignation_cnt as "resignation_cnt"
+            , approval_type.approval_name as "approval"
+            , to_char(approval.approval_time, 'YYYY-MM-DD HH24:MI:SS') as "approval_time"
+             <if test="report_code == 2">
+                , to_char(<include refid="reportFrom"/>.expense_date, 'YYYY-MM-DD HH24:MI:SS') as "expense_date"
+             </if>
+             <if test="report_code != 2">
+                , to_char(<include refid="reportFrom"/>.start_date, 'YYYY-MM-DD HH24:MI:SS') as "start_date"
+                , to_char(<include refid="reportFrom"/>.end_date, 'YYYY-MM-DD HH24:MI:SS') as "end_date"
+             </if>
+         from approval, employee, jikup, report_type_code, approval_type, <include refid="reportFrom"/>
+         where <include refid="reportWhere"/>
+            and approval.approval_no in    
+               (select max(approval_no) from approval 
+               where r_no in
+                  (select r_no from <include refid="reportFrom"/>, employee, jikup 
+                     where approval_line in 
+                       (select line_no
+                       from approval_line
+                       where emp_no = ${emp_no})
+                     and <include refid="reportFrom"/>.emp_no = employee.emp_no
+                     and employee.jikup_code = jikup.jikup_code
+                     and employee.jikup_code >= (select jikup_code from employee where emp_no = ${emp_no})
+                  )
+               and approval.company_code = ${company_code}
+               and approval.report_code = ${report_code}
+               group by r_no)
+            and approval.r_no = <include refid="reportFrom"/>.r_no
+            and employee.emp_no = <include refid="reportFrom"/>.emp_no
+            and jikup.jikup_code = employee.jikup_code
+            and report_type_code.type_code = <include refid="reportFrom"/>.type_code
+            and approval_type.approval_code = <include refid="reportFrom"/>.approval_code
+            order by <include refid="reportFrom"/>.r_no desc
+           ) zxcvb)
+      where RNUM &gt;= ${begin_rowNo} and RNUM &lt;= ${end_rowNo} 
+          
+   </select>
+   
+   <!-- 검색한 보고서 목록의 총 개수 반환 -->
+   <select id="getReportListTotCnt" resultType="int">
+   
+         select count(*) from <include refid="reportFrom"/>, approval, employee
+         where <include refid="reportWhere"/>
+            and approval.approval_no in    
+              (select max(approval_no) from approval 
+               where r_no in
+                  (select r_no from <include refid="reportFrom"/>, employee, jikup 
+                     where approval_line in 
+                       (select line_no
+                       from approval_line
+                       where emp_no = ${emp_no})
+                     and <include refid="reportFrom"/>.emp_no = employee.emp_no
+                     and employee.jikup_code = jikup.jikup_code
+                     and employee.jikup_code >= (select jikup_code from employee where emp_no = ${emp_no})
+                  )
+               and approval.company_code = ${company_code}
+               and approval.report_code = ${report_code}
+               group by r_no)
+            and approval.r_no = <include refid="reportFrom"/>.r_no
+            and employee.emp_no = <include refid="reportFrom"/>.emp_no
+            and approval.company_code = ${company_code}
+         
+   </select>
+   
+   
+   
+   
+   
+   
+   <!-- reportRegProc.do -->
+   <!-- 각 보고서 테이블에 보고서 정보 삽입 -->
+   <insert id="insertReport" parameterType="com.example.paperless.ReportDTO">
+      
+      <if test="report_code == 2">
+      insert into expense_report(r_no, report_no, report_code, company_code, emp_no, approval_line, title, type_code, approval_code, expense_date, resignation_cnt, cost, method_code, receipt_no, note)
+      </if>
+      <if test="report_code != 2">
+         insert into <include refid="reportFrom"/>(r_no, report_no, report_code, company_code, emp_no, approval_line, title, type_code, approval_code, start_date, end_date, resignation_cnt,
+         <if test="report_code == 1 or report_code == 4">content)</if>
+         <if test="report_code == 3">sales_content, sales_result, sales_company, sales_name, sales_jikup, sales_phone)</if>
+      </if>
+      values(
+         (select nvl(max(r_no), 0) + 1 from <include refid="reportFrom"/>) <!-- r_no -->
+         , (select nvl(max(report_no), 0) + 1 from <include refid="reportFrom"/> where company_code = ${company_code}) <!-- report_no -->
+         , ${report_code}
+         , ${company_code}
+         , ${emp_no}
+         , ${approval_line}
+         , '${title}'
+         , ${type_code}
+         , ${approval_code}
+         <if test="report_code == 2">
+         , to_date('${expense_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         <if test="report_code != 2">
+         , to_date('${start_date}', 'YYYY-MM-DD HH24:MI:SS')
+         , to_date('${end_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         , ${update_cnt}
+      <if test="report_code == 1 or report_code == 4">
+         , '${content}'
+      </if>
+      <if test="report_code == 2">
+         , '${cost}'
+         , ${method_code}
+         , ${receipt_no}
+         , '${note}'
+      </if>
+      <if test="report_code == 3">
+         , '${sales_content}'
+         , '${sales_result}'
+         , '${sales_company}'
+         , '${sales_name}'
+         , '${sales_jikup}'
+         , '${sales_phone}'
+      </if>
+      )
+   </insert>
+   
+   <!-- 결재 상황 테이블에 보고서 작성자 (결재완료) 삽입 -->
+   <insert id="insertReport_approval" parameterType="com.example.paperless.ReportDTO">
+   
+      insert into approval(approval_no, approval_code, company_code, report_code, r_no, resignation_cnt, approval_time, emp_no)
+        values(
+            (select nvl(max(approval_no), 0) + 1 from approval)
+            , 2
+            , ${company_code}
+            , ${report_code}
+            , (select max(r_no) from <include refid="reportFrom"/>)
+            , 0
+            , to_date(to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+            , ${emp_no}
+        )
+   
+   </insert>
+   
+   <!-- 결재 상황 테이블에 다음 결재자 (결재대기) 삽입 -->
+   <insert id="insertReport_approvalNext" parameterType="com.example.paperless.ReportDTO">
+   
+      insert into approval(approval_no, approval_code, company_code, report_code, r_no, resignation_cnt, approval_time, emp_no)
+        values(
+            (select nvl(max(approval_no), 0) + 1 from approval)
+            , 1
+            , ${company_code}
+            , ${report_code}
+            <if test="resignation_cnt == 0">
+            , (select max(r_no) from <include refid="reportFrom"/>)
+            </if>
+            <if test="resignation_cnt != 0">
+            , ${r_no}
+            </if>
+            , ${resignation_cnt}
+            , to_date(to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+            , ${next_emp_no}
+        )
+   
+   </insert>
+   
+   
+   
+   <!-- reportDetail.do -->
+   <!-- 해당 보고서의 정보 반환 -->
+   <select id="getReport" parameterType="com.example.paperless.ReportDTO" resultType="com.example.paperless.ReportDTO">
+      
+      select <include refid="reportFrom"/>.r_no as "r_no"
+         , <include refid="reportFrom"/>.report_no as "report_no"
+         , <include refid="reportFrom"/>.report_code as "report_code"
+         , <include refid="reportFrom"/>.company_code as "company_code"
+         , <include refid="reportFrom"/>.approval_line as "approval_line"
+         , <include refid="reportFrom"/>.approval_code as "approval_code"
+          , <include refid="reportFrom"/>.emp_no as "emp_no"
+          , employee.name as "emp_name"
+          , employee.img as "emp_img"
+          , company.company_name as "company_name"
+          , jikup.jikup_name as "jikup_name"
+          , dept.dept_name as "dept_name"
+          , employee.email as "email"
+          , employee.phone_num as "phone_num"
+          , <include refid="reportFrom"/>.title as "title"
+          , <include refid="reportFrom"/>.type_code as "type_code"
+          , report_type_code.type_name as "type_name"
+          , <include refid="reportFrom"/>.resignation_cnt as "resignation_cnt"
+          <if test='report_code == 2'>
+          , to_char(<include refid="reportFrom"/>.expense_date, 'YYYY-MM-DD HH24:MI:SS') as "expense_date"
+          </if>
+          <if test='report_code != 2'>
+          , to_char(<include refid="reportFrom"/>.start_date, 'YYYY-MM-DD HH24:MI:SS') as "start_date"
+          , to_char(<include refid="reportFrom"/>.end_date, 'YYYY-MM-DD HH24:MI:SS') as "end_date"
+          </if>
+          
+          <if test='report_code == 1 or report_code == 4' >
+          , <include refid="reportFrom"/>.content as "content"
+          </if>
+          <if test='report_code == 2'>
+          , <include refid="reportFrom"/>.cost as "cost"
+          , <include refid="reportFrom"/>.method_code as "method_code"
+          , expense_method.method_name as "method_name"
+          , <include refid="reportFrom"/>.receipt_no as "receipt_no"
+          , <include refid="reportFrom"/>.note as "note"
+          </if>
+          <if test='report_code == 3'>
+          , <include refid="reportFrom"/>.sales_content as "sales_content"
+          , <include refid="reportFrom"/>.sales_result as "sales_result"
+          , <include refid="reportFrom"/>.sales_company as "sales_company"
+          , <include refid="reportFrom"/>.sales_name as "sales_name"
+          , <include refid="reportFrom"/>.sales_jikup as "sales_jikup"
+          , <include refid="reportFrom"/>.sales_phone as "sales_phone"
+          </if>
+      from employee, company, jikup, dept, report_type_code, <include refid="reportFrom"/>
+      <if test='report_code == 2'>
+      , expense_method
+      </if>
+      where <include refid="reportFrom"/>.r_no = ${r_no}
+          and employee.emp_no = <include refid="reportFrom"/>.emp_no
+          and employee.company_code = company.company_code
+          and jikup.jikup_code = employee.jikup_code
+          and dept.dept_code = employee.dept_code
+          and report_type_code.type_code = <include refid="reportFrom"/>.type_code
+          <if test='report_code == 2'>
+         and expense_method.method_code = <include refid="reportFrom"/>.method_code
+         </if>
+      
+   </select>
+   
+   <!-- 해당 보고서의 결재 상황 리스트 반환 -->
+   <select id="getApprovalList" parameterType="com.example.paperless.ReportDTO" resultType="java.util.HashMap">
+   
+      select approval.approval_no as "approval_no"
+            , employee.name as "emp_name"
+            , employee.img as "emp_img"
+            , dept.dept_name as "dept_name"
+            , jikup.jikup_name as "jikup_name"
+            , approval_type.approval_name as "approval"
+            , approval.approval_code as "approval_code"
+            , approval.approval_time as "approval_time"
+            , approval.resignation_cnt as "resignation_cnt"
+            , resignation.resignation_content as "resignation_content"
+        from employee, dept, jikup, approval_type, approval, resignation
+        where approval.company_code = ${company_code} 
+           and approval.r_no = ${r_no}
+           and approval.report_code = ${report_code}
+           and employee.emp_no = approval.emp_no
+           and dept.dept_code = employee.dept_code
+           and jikup.jikup_code = employee.jikup_code
+           and approval_type.approval_code = approval.approval_code
+           and approval.approval_no = resignation.approval_no(+)
+        order by approval.approval_no asc
+   
+   </select>
+   
+   <!-- 다음 결재자(결재 상황 테이블에서의 결재 대기 상태)의 사원번호 반환 -->
+   <select id="getNextEmpNo" parameterType="com.example.paperless.ReportDTO" resultType="int">
+   
+      select emp_no from approval 
+      where company_code = ${company_code} 
+         and r_no = ${r_no} 
+         and report_code = ${report_code} 
+         and approval_code = 1
+   
+   </select>
+   
+   <!-- 수정 가능한 상황인지 알 수 있는 결재 상황 갯수 반환 -->
+   <select id="approvalListSize" parameterType="com.example.paperless.ReportDTO" resultType="int">
+   
+      select count(*) from approval 
+      where company_code = ${company_code} 
+         and r_no = ${r_no} 
+         and report_code = ${report_code} 
+         and resignation_cnt = (select resignation_cnt from <include refid="reportFrom"/> where  r_no = ${r_no})
+         
+   </select>
+   
+   
+   
+   
+   <!-- reportUpProc.do -->
+   <!-- 보고서 작성자가 결재 되기 전 보고서 내용 수정 -->
+   <update id="updateReport" parameterType="com.example.paperless.ReportDTO">
+   
+      update <include refid="reportFrom"/>
+      set approval_line = ${approval_line}
+         , title = '${title}'
+         , type_code = ${type_code}
+         , approval_code = ${approval_code}
+         <if test="report_code == 2">
+         , expense_date = to_date('${expense_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         <if test="report_code != 2">
+         , start_date = to_date('${start_date}', 'YYYY-MM-DD HH24:MI:SS')
+         , end_date = to_date('${end_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         <if test="report_code == 1 or report_code == 4">
+         , content = '${content}'
+         </if>
+         <if test="report_code == 2">
+         , cost = '${cost}'
+         , method_code = ${method_code}
+         , receipt_no = ${receipt_no}
+         , note = '${note}'
+         </if>
+         <if test="report_code == 3">
+         , sales_content = '${sales_content}'
+         , sales_result = '${sales_result}'
+         , sales_company = '${sales_company}'
+         , sales_name = '${sales_name}'
+         , sales_jikup = '${sales_jikup}'
+         , sales_phone = '${sales_phone}'
+         </if>
+      where r_no = ${r_no} 
+         and emp_no = ${emp_no}
+      
+   </update>
+   
+   <!-- 보고서 작성자가 보고서 수정할 때 다음 결재자 사원코드 변경 -->
+   <update id="updateReport_ApprovalNextEmp" parameterType="com.example.paperless.ReportDTO">
+   
+      update approval
+      set emp_no = ${next_emp_no}
+      where company_code = ${company_code} 
+         and r_no = ${r_no} 
+         and report_code = ${report_code}  
+         and approval_code = 1
+      
+   </update>
+   
+   
+   
+   
+   
+   
+   
+   
+   <!-- reportDelProc.do -->
+   <!-- 보고서 삭제 -->
+   <delete id="deleteReport" parameterType="com.example.paperless.ReportDTO">
+   
+      delete <include refid="reportFrom"/> where r_no = ${r_no}
+   
+   </delete>
+   
+   <delete id="deleteApproval" parameterType="com.example.paperless.ReportDTO">
+   
+      delete approval 
+      where company_code = ${company_code} 
+         and r_no = ${r_no}
+         and report_code = ${report_code} 
+   
+   </delete>
+   
+   
+   
+   
+   
+   
+   
+   <!-- reportApprovalProc.do -->
+   <!-- 결재 상황 테이블에서의 emp_no 상태(결재완료/반려) 변경 -->
+   <update id="updateReport_approval" parameterType="com.example.paperless.ReportDTO">
+   
+      update approval
+      set approval_code = ${approval_code}
+         , approval_time = to_date(to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+      where company_code = ${company_code} 
+         and r_no = ${r_no} 
+         and report_code = ${report_code}  
+         and emp_no = ${emp_no}
+         and resignation_cnt = ${resignation_cnt}
+      
+   </update>
+   
+   <!-- 결재 상황 테이블에 다다음 결재자(결재) / 최초 작성자(반려) 상태(결재대기)로 삽입 -->
+   <insert id="insertReport_approvalNext1" parameterType="com.example.paperless.ReportDTO">
+   
+      insert into approval(approval_no, approval_code, company_code, report_code, r_no, resignation_cnt, approval_time, emp_no)
+        values(
+            (select nvl(max(approval_no), 0) + 1 from approval)
+            , 1
+            , ${company_code}
+            , ${report_code}
+            , ${r_no}
+            <if test="approval_code == 3">
+            , ${resignation_cnt} + 1
+            </if>
+            <if test="approval_code != 3">
+            , ${resignation_cnt}
+            </if>
+            , to_date(to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+            , ${next_emp_no}
+        )
+   
+   </insert>
+   
+   <!-- 결재 반려시 각 보고서 테이블에서의 해당 보고서 결재 상태(반려), 결재 시간 변경 -->
+   <update id="updateReport_approvalCode" parameterType="com.example.paperless.ReportDTO">
+   
+      update <include refid="reportFrom"/>
+      set approval_code = ${approval_code}
+      <if test="approval_code == 3">
+      , resignation_cnt = resignation_cnt + 1
+      </if>
+      where r_no = ${r_no}
+      
+   </update>
+   
+   
+   <!-- 결재 반려 사유를 반려 테이블에 저장 -->
+   <insert id="insertResignationContent" parameterType="com.example.paperless.ReportDTO">
+   
+      insert into resignation(approval_no, resignation_content)
+      values(
+         (select approval_no from approval 
+         where company_code = ${company_code} 
+            and r_no = ${r_no} 
+            and report_code = ${report_code}
+            and approval_code = 3 
+            and resignation_cnt = ${resignation_cnt})
+         , '${resignation_content}'
+      )
+   
+   </insert>
+   
+   <!-- 반려된 보고서 재결재 올릴 때 보고서 정보 수정 -->
+   <update id="updateReport_resignation" parameterType="com.example.paperless.ReportDTO">
+   
+      update <include refid="reportFrom"/>
+      set title = '${title}'
+         , type_code = ${type_code}
+         , approval_code = 1
+         <if test="report_code == 2">
+         , expense_date = to_date('${expense_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         <if test="report_code != 2">
+         , start_date = to_date('${start_date}', 'YYYY-MM-DD HH24:MI:SS')
+         , end_date = to_date('${end_date}', 'YYYY-MM-DD HH24:MI:SS')
+         </if>
+         <if test="report_code == 1 or report_code == 4">
+         , content = '${content}'
+         </if>
+         <if test="report_code == 2">
+         , cost = ${cost}
+         , method_code = ${method_code}
+         , receipt_no = ${receipt_no}
+         , note = '${receipt_no}'
+         </if>
+         <if test="report_code == 3">
+         , sales_content = '${sales_content}'
+         , sales_result = '${sales_result}'
+         , sales_company = '${sales_company}'
+         , sales_name = '${sales_content}'
+         , sales_jikup = '${sales_jikup}'
+         , sales_phone = '${sales_phone}'
+         </if>
+      where company_code = ${company_code} 
+         and r_no = ${r_no} 
+         and report_code = ${report_code}  
+         and emp_no = ${emp_no}
+      
+   </update>
+</mapper>

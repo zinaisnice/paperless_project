@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.paperless.PlannerDAO">
+	
+	<!-- plannerList.do -->
+	<!-- 일정 목록 가져오기 -->
+	<select id="getPlanList" parameterType="com.example.paperless.PlannerDTO" resultType="java.util.HashMap">
+	
+		select plan_no as "plan_no"
+			, plan_name as "plan_name"
+			, to_char(start_date, 'YYYY-MM-DD HH24:MI:SS') as "plan_start_date"
+			, to_char(end_date, 'YYYY-MM-DD HH24:MI:SS') as "plan_end_date"
+			, emp_no as "emp_no"
+		from planner
+		where emp_no = ${emp_no}
+	
+	</select>
+	
+	<!-- planRegProc.do -->
+	<!-- 일정 추가 -->
+	<insert id="insertPlan" parameterType="com.example.paperless.PlannerDTO">
+	
+		insert into planner(
+			plan_no
+			, plan_name
+			, start_date
+			, end_date
+			, emp_no
+		)
+		values(
+			(select nvl(max(plan_no),0) + 1 from planner)
+			, '${plan_name}'
+			, to_date('${plan_start_date}', 'YYYY-MM-DD HH24:MI:SS')
+			, to_date('${plan_end_date}', 'YYYY-MM-DD HH24:MI:SS')
+			, ${emp_no}
+		)
+	
+	</insert>
+	
+	
+	<!-- updatePlanProc.do -->
+	<!-- 일정 수정 -->
+	<update id="updatePlan">
+		
+		update planner
+		set start_date = to_date('${plan_start_date}', 'YYYY-MM-DD AM HH:MI:SS')
+			, end_date = to_date('${plan_end_date}', 'YYYY-MM-DD AM HH:MI:SS') 
+		where plan_no = ${plan_no}
+			and emp_no = ${emp_no}
+		
+	</update>
+	
+	
+	
+	<!-- delPlanProc.do -->
+	<!-- 일정 삭제 -->
+	<delete id="deletePlan">
+		
+		delete planner where plan_no = ${plan_no} and emp_no = ${emp_no}
+		
+	</delete>
+</mapper>

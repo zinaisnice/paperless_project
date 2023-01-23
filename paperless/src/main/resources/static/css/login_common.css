@@ -1,0 +1,97 @@
+@charset "UTF-8";
+
+
+body, .container {
+	background-color: var(--main-color);
+	height: 100%;
+}
+
+.container {
+	margin: 20px auto;
+}
+
+.logo_div {
+	width: 700px;
+	height: 150px;
+	margin: 20px auto;
+	padding-top: 30px;
+}
+
+.logo_img{
+	width: 500px;
+	height: 120px;
+	background-color: var(--main-color);
+	margin: 0 auto;
+}
+
+.logo_img img{
+	width: 500px;
+	height: 120px;
+}
+
+.logo {
+	width: 600px;
+	font-size: 50px;
+	font-weight: bold;
+	margin: 0 auto;
+	text-align: center;
+}
+
+#paper {
+	color: #EA971B;
+}
+
+#less {
+	color: white;
+}
+
+.login_form{
+	width: 400px;
+	margin: 0 auto;
+	color: white;
+}
+
+.row {
+	width: 400px;
+	background-color: var(--main-color);
+	height: 50px;
+	padding: 15px;
+}
+
+.login_icon{
+	width: 50px;
+	float: left;
+	padding-left:10px;
+}
+
+.login_input{
+	width: 300px;
+}
+
+.login_input input{
+	width: 250px;
+	background-color: var(--main-color);
+	border: none;
+	color: white;
+}
+
+.row_input {
+	border: 3px solid var(--sub-color);
+	border-radius: 15px;	
+}
+
+.button_div {
+	width: 400px;
+	margin:  0 auto;
+	text-align: center;
+}
+
+.button_div input, [type=button] {
+	width: 400px;
+	margin: 10px 0;
+	padding: 15px;
+	cursor: pointer;
+	font-weight: bold;
+	border-radius: 10px;
+	
+}

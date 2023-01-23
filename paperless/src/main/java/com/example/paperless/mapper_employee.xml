@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.paperless.EmployeeDAO">
+
+	<sql id="employeeWhere">
+		1=1
+		
+		and employee.role = 'USER'
+		
+		<if test="keyword != null and keyword.length() > 0">
+			and (
+				upper(employee.name) like upper('%${keyword}%')
+				or
+				upper(employee.emp_no) like upper('%${keyword}%')
+				or
+				upper(employee.phone_num) like upper('%${keyword}%')
+			)
+		</if>
+		
+		<if test="dept != null">
+			<foreach collection="dept" item="xxx" open="and (" close=")" separator="or">
+			
+				employee.dept_code = ${xxx}
+			
+			</foreach>
+		</if>
+		
+		<if test="jikup != null">
+			<foreach collection="jikup" item="xxx" open="and (" close=")" separator="or">
+			
+				employee.jikup_code = ${xxx}
+			
+			</foreach>
+		</if>
+	</sql>
+	
+	
+	<!-- 사원의 정보 반환 -->
+	<select id="getEmpInfo" parameterType="String" resultType="com.example.paperless.EmployeeDTO">
+	
+		select emp_no as "emp_no"
+			, employee.name as "emp_name"
+			, employee.img as "emp_img"
+			, employee.company_code as "company_code"
+			, company.company_name as "company_name"
+			, employee.id as "id"
+			, employee.pwd as "pwd"
+			, employee.jikup_code as "jikup_code"
+			, jikup.jikup_name as "jikup_name"
+			, employee.dept_code as "dept_code"
+			, dept.dept_name as "dept_name"
+			, employee.email as "email"
+			, employee.phone_num as "phone_num"
+			, employee.role as "role"
+		from employee, jikup, dept, company
+		where employee.company_code = company.company_code
+			and employee.jikup_code = jikup.jikup_code
+			and employee.dept_code = dept.dept_code
+			and employee.id = '${login_id}'
+	
+	</select>
+	
+	<!-- 해당 회사의 부서 목록 반환 -->
+	<select id="getDept" parameterType="int" resultType="java.util.HashMap">
+		select dept_name as "dept_name"
+			, dept_code as "dept_code"
+		from dept
+		where dept.company_code = ${company_code}
+			and dept_code != 0
+	</select>
+	
+	<!-- 해당 회사의 모든 직원 목록 리턴 하는 메소드 -->
+	<select id="getAllEmployeeList" parameterType="int" resultType="java.util.HashMap">
+		
+	select employee.emp_no                     as "emp_no"
+            , employee.id						as "id"
+            , employee.name                     as "emp_name"
+            , employee.img 						as "emp_img"
+            , jikup.jikup_code					as "jikup_code"
+            , jikup.jikup_name                 as "jikup_name"
+            , employee.dept_code				as "dept_code"
+            , dept.dept_name                 as "dept_name"
+            , employee.email				as "email"
+            , employee.phone_num                as "phone_num"
+		from employee, jikup, dept
+		
+		where employee.company_code = ${company_code}
+		and employee.jikup_code = jikup.jikup_code 
+		and employee.dept_code = dept.dept_code
+		and employee.role = 'USER'
+		order by employee.jikup_code asc
+		
+	</select>
+	
+	<!-- employeeList.do -->
+	<!-- 검색한 직원 목록 리턴 하는 메소드 -->
+	<select id="getEmployeeList" parameterType="com.example.paperless.EmployeeSearchDTO" resultType="java.util.HashMap">
+		
+		select * from( select  rownum RNUM, xxx.* from  (select  
+ 
+            employee.emp_no                     as "emp_no"
+            , employee.id						as "id"
+            , employee.name                     as "emp_name"
+            , employee.img 						as "emp_img"
+            , jikup.jikup_name                 as "jikup_name"
+            , dept.dept_name                 as "dept_name"
+            , employee.phone_num                as "phone_num"
+            
+            
+		from employee, jikup, dept
+		
+		where <include refid="employeeWhere"/>
+		and employee.company_code = ${company_code}
+		and employee.jikup_code = jikup.jikup_code 
+		and employee.dept_code = dept.dept_code
+		order by employee.emp_no desc     
+		<![CDATA[
+		)  xxx ) where  RNUM >= ${begin_rowNo} and RNUM <= ${end_rowNo}
+		]]>
+		
+	</select>
+	
+	<!-- [직원 목록]의 총개수 리턴  -->	
+    <select id="getEmployeeListAllTotCnt" parameterType="int" resultType="int">
+    
+    	select count(*) from employee where company_code = ${company_code} and jikup_code != 0
+    	
+    </select>
+	
+	<!-- [검색한 직원 목록]의 총개수 리턴  -->	
+    <select id="getEmployeeListTotCnt" parameterType="com.example.paperless.EmployeeSearchDTO" resultType="int">
+    
+    	select count(*) from employee where company_code = ${company_code} and <include refid="employeeWhere"/>
+    </select>
+    
+    
+    
+    <!--  employeeRegProc.do -->
+	<!-- 새로운 직원 추가 -->
+    <insert id="insertEmployee" parameterType="com.example.paperless.EmployeeDTO">
+    	insert into employee(
+    		emp_no
+    		, company_code
+    		, name
+    		, id
+    		, pwd
+    		, jikup_code
+    		, dept_code
+    		, email
+    		, phone_num
+    		, role
+    	)
+    	values (
+    		(select max(emp_no) + 1 from employee where emp_no like '${company_code}'||'%')
+    		, ${company_code}
+    		, '${emp_name}'
+    		, '${id}'
+    		, '${pwd}'
+    		, ${jikup_code}
+    		, ${dept_code}
+    		, '${email}'
+    		, '${phone_num}'
+    		, 'USER'
+    	)
+    </insert>
+     
+	
+	<!-- employeeUpProc.do -->
+	<!-- 직원 정보 수정 -->
+	<update id="updateEmployee" parameterType="com.example.paperless.EmployeeDTO">
+		update employee
+		set name = '${emp_name}'
+			<!-- , pwd = '${pwd}'-->
+			<if test="newPwd != null and newPwd.length() > 0">, pwd = '${newPwd}'</if>
+			, dept_code = ${dept_code}
+			, jikup_code = ${jikup_code}
+			, email = '${email}'
+			, phone_num = '${phone_num}'
+		where emp_no = ${emp_no}
+	</update>
+	
+	<!-- 내 정보 수정 -->
+	<update id="updateMyEmployee" parameterType="com.example.paperless.EmployeeDTO">
+		update employee
+		set email = '${email}'
+			, phone_num = '${phone_num}'
+			<if test="newPwd != null and newPwd.length() > 0">, pwd = '${newPwd}'</if>
+		where emp_no = ${emp_no}
+	</update>
+</mapper>

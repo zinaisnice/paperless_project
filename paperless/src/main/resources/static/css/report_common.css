@@ -1,0 +1,37 @@
+@charset "UTF-8";
+
+:root {
+	--main-color: #265132;
+}
+
+#report_detail {
+    border: 5px solid var(--main-color);
+    margin: 0 auto;
+ 
+}
+
+.emp_info{
+	margin: 20px 5%;
+}
+
+.report_type {
+    margin: 20pt;
+    padding: 20pt;
+}
+
+.date {
+	width: 222px;
+}
+
+.title {
+	width: 80%;
+	height: 100%;
+}
+
+#Daily_content {
+	min-height: 200px;
+}
+
+th {
+	width: 150px;
+}

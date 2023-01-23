@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.paperless.ApprovalLineDAO">
+	
+	 <!-- 동일명 회사 존재 확인 -->
+	<select id="searchCompanyName" parameterType="String" resultType="int">
+	
+		select count(*) from company where company_name = '${company_name}'
+		
+	</select>
+	
+	<!-- 새로운 회사 추가 -->
+	<insert id="insertCompany" parameterType="String">
+	
+		insert into company(company_code, company_name) 
+		values(
+			(select max(company_code) + 1 from company)
+			, '${company_name}'
+		)
+		
+	</insert>
+	
+	
+	
+    <!-- 새로운 회사 관리자 추가 -->
+    <insert id="insertManager" parameterType="String">
+    
+    	insert into employee(
+    		emp_no
+    		, company_code
+    		, name
+    		, id
+    		, pwd
+    		, jikup_code
+    		, dept_code
+    		, email
+    		, phone_num
+    		, role
+    	)
+    	values (
+    		to_number((select company_code from company where company_name = '${company_name}')||'001')
+    		, (select company_code from company where company_name = '${company_name}')
+    		, '${company_name} manager'
+    		, (select company_code from company where company_name = '${company_name}')||''
+    		, 'admin'
+    		, 0
+    		, 1
+    		, 'MANAGER'
+    		, 'MANAGER'
+    		, 'MANAGER'
+    	)
+    	
+    </insert>
+    
+    <!-- 새로운 회사 직원 추가 -->
+	<insert id="insertEmployee" parameterType="com.example.paperless.EmployeeDTO">
+	
+		insert into employee(
+    		emp_no
+    		, company_code
+    		, name
+    		, id
+    		, pwd
+    		, jikup_code
+    		, dept_code
+    		, email
+    		, phone_num
+    		, role
+    	)
+    	values (
+   			to_number((select company_code from company where company_name = '${company_name}')||'00'||'${order + 1}')
+    		, (select company_code from company where company_name = '${company_name}')
+    		, '${emp_name}'
+    		, '${id}'
+    		, '${pwd}'
+    		, ${jikup_code}
+    		, ${dept_code}
+    		, '${email}'
+    		, '${phone_num}'
+    		, 'USER'
+    	)
+    	
+	</insert>
+	
+	<!-- 새로운 회사 결재라인 추가 -->
+	<insert id="insertApprovalLine" parameterType="com.example.paperless.EmployeeDTO">
+	
+		insert into approval_line(
+		    approval_line_no
+		    , company_code
+		    , emp_no
+		    , line_no
+		    , line_order
+		)
+		values(
+		    (select count(*) + 1 from approval_line)
+		    , (select company_code from company where company_name = '${company_name}')
+		    , to_number((select company_code from company where company_name = '${company_name}')||'00'||'${order + 1}')
+		    , 1
+		    , ${order}
+		)
+		
+	</insert>
+	
+	
+	<!-- 회사 몇번째 결재라인인지, 해당 결재라인의 인원수 반환 -->
+	<select id="getApprovalLineNo" parameterType="int" resultType="java.util.HashMap">
+	
+		select line_no as "line_no"
+	        , count(*) as "line_person"
+	    from approval_line
+	    where company_code = ${company_code}
+	    group by line_no
+	    
+	</select>
+	
+	<!-- 회사 결재라인 정보 가져오기 -->
+	<select id="getApprovalLineInfo" parameterType="int" resultType="java.util.HashMap">
+	
+		select approval_line.line_no as "line_no"
+			, approval_line.line_order as "order_no"
+		    , employee.name as "emp_name"
+		    , jikup.jikup_name as "jikup"
+		    , dept.dept_name as "dept"
+		    , employee.phone_num as "phone_num"
+		from approval_line, employee, jikup, dept
+		where approval_line.company_code = ${company_code}
+		    and employee.emp_no = approval_line.emp_no
+		    and employee.jikup_code = jikup.jikup_code
+		    and employee.dept_code = dept.dept_code
+		    order by line_order asc
+		    
+	</select>
+	
+	<!-- 기존 회사 새로운 결재라인 추가 -->
+	<insert id="addApprovalLine" parameterType="com.example.paperless.EmployeeDTO">
+	
+		insert into approval_line(
+		    approval_line_no
+		    , company_code
+		    , emp_no
+		    , line_no
+		    , line_order
+		)
+		values(
+		    (select count(*) + 1 from approval_line)
+		    , ${company_code}
+		    , ${emp_no}
+		    , (select  max(line_no)
+			   <if test="order == 1">
+		        	 + 1
+			   </if>
+				from approval_line where company_code = ${company_code})
+			, ${order}
+		)
+		
+	</insert>
+</mapper>

@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.paperless.DashboardDAO">
+	
+	<sql id="approvalStateFrom">
+		<if test="approvalState_reportCode == 1">
+		   daily_report
+		</if>
+		<if test="approvalState_reportCode == 2">
+		   expense_report
+		</if>
+		<if test="approvalState_reportCode == 3">
+		   sales_report
+		</if>
+	</sql>
+	
+	<sql id="typeNoFrom">
+		<if test="typeNo_reportCode == 1">
+		   daily_report
+		</if>
+		<if test="typeNo_reportCode == 2">
+		   expense_report
+		</if>
+		<if test="typeNo_reportCode == 3">
+		   sales_report
+		</if>
+	</sql>
+	
+	<!-- 월별 등록한 보고서 결재 상태별 갯수 -->
+	<select id="getApprovalCnt" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select M.MONTH||'월' as "month"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 1     
+				group by r_no)
+			and emp_no = ${emp_no}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "daily"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 2     
+				group by r_no)
+			and emp_no = ${emp_no}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "expense"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 3     
+				group by r_no)
+			and emp_no = ${emp_no}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "sales"
+		from ( SELECT '01' "MONTH" FROM DUAL
+			UNION SELECT '02' FROM DUAL
+			UNION SELECT '03' FROM DUAL
+			UNION SELECT '04' FROM DUAL
+			UNION SELECT '05' FROM DUAL
+			UNION SELECT '06' FROM DUAL
+			UNION SELECT '07' FROM DUAL
+			UNION SELECT '08' FROM DUAL
+			UNION SELECT '09' FROM DUAL
+			UNION SELECT '10' FROM DUAL
+			UNION SELECT '11' FROM DUAL
+			UNION SELECT '12' FROM DUAL
+			) M
+		
+	</select>
+	
+	<!-- 년도별 등록한 보고서 업무구분별 개수 -->
+	<select id="getApprovalState" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select approval_type.approval_name as "approval_name"
+		    , (select count(*) from <include refid="approvalStateFrom"/>
+		        where company_code = ${company_code}
+		        and emp_no = ${emp_no}
+		        and approval_type.approval_code = <include refid="approvalStateFrom"/>.approval_code
+		        and r_no in (select r_no from approval
+		            where approval_no in
+		                (select min(approval_no) from approval     
+						where to_char(approval_time, 'YYYY-MM') = '${approvalState_year}-${approvalState_month}'     
+						and company_code = ${company_code}     
+						and report_code = ${approvalState_reportCode}     
+						group by r_no)
+					and emp_no = ${emp_no})
+		        ) as "cnt"
+		from approval_type
+			
+	</select>
+	
+	
+	<!-- 년도별 등록한 보고서 업무구분별 개수 -->
+	<select id="getTypeNo" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select report_type_code.type_name as "type_name"    
+			, (select count(*) from <include refid="typeNoFrom"/>     
+			where r_no in      
+				(select r_no from approval      
+				where approval_no in       
+					(select min(approval_no) from approval       
+					where to_char(approval_time, 'YYYY') = '${typeNo_year}'       
+						and company_code = ${company_code}       
+						and report_code = ${typeNo_reportCode}       
+						group by r_no)      
+				and emp_no = ${emp_no})     
+			and company_code = ${company_code}     
+			and report_type_code.type_code = <include refid="typeNoFrom"/>.type_code) as "cnt"   
+		from report_type_code
+		where report_type_code.report_code = ${typeNo_reportCode}
+		
+	</select>
+	
+	
+	
+	<!-- MANAGER -->
+	<!-- 월별 등록한 보고서 결재 상태별 갯수 -->
+	<select id="getAllApprovalCnt" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select M.MONTH||'월' as "month"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 1     
+				group by r_no)
+			and company_code = ${company_code}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "daily"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 2     
+				group by r_no)
+			and company_code = ${company_code}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "expense"
+			, (select count(*) from approval
+			where approval_no in
+				(select min(approval_no) from approval     
+				where to_char(approval_time, 'YYYY') = '${approvalCnt_year}'     
+				and company_code = ${company_code}     
+				and report_code = 3     
+				group by r_no)
+			and company_code = ${company_code}
+			and M.MONTH = to_char(approval.approval_time, 'MM')) as "sales"
+		from ( SELECT '01' "MONTH" FROM DUAL
+			UNION SELECT '02' FROM DUAL
+			UNION SELECT '03' FROM DUAL
+			UNION SELECT '04' FROM DUAL
+			UNION SELECT '05' FROM DUAL
+			UNION SELECT '06' FROM DUAL
+			UNION SELECT '07' FROM DUAL
+			UNION SELECT '08' FROM DUAL
+			UNION SELECT '09' FROM DUAL
+			UNION SELECT '10' FROM DUAL
+			UNION SELECT '11' FROM DUAL
+			UNION SELECT '12' FROM DUAL
+			) M
+		
+	</select>
+	
+	<!-- 년도별 등록한 보고서 업무구분별 개수 -->
+	<select id="getAllApprovalState" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select approval_type.approval_name as "approval_name"
+		    , (select count(*) from <include refid="approvalStateFrom"/>
+		        where company_code = ${company_code}
+		        and approval_type.approval_code = <include refid="approvalStateFrom"/>.approval_code
+		        and r_no in (select r_no from approval
+		            where approval_no in
+		                (select min(approval_no) from approval     
+						where to_char(approval_time, 'YYYY-MM') = '${approvalState_year}-${approvalState_month}'     
+						and company_code = ${company_code}     
+						and report_code = ${approvalState_reportCode}     
+						group by r_no))
+		        ) as "cnt"
+		from approval_type
+			
+	</select>
+	
+	
+	<!-- 년도별 등록한 보고서 업무구분별 개수 -->
+	<select id="getAllTypeNo" parameterType="com.example.paperless.DashboardDTO" resultType="java.util.HashMap">
+	
+		select report_type_code.type_name as "type_name"    
+			, (select count(*) from <include refid="typeNoFrom"/>     
+			where r_no in      
+				(select r_no from approval      
+				where approval_no in       
+					(select min(approval_no) from approval       
+					where to_char(approval_time, 'YYYY') = '${typeNo_year}'       
+						and company_code = ${company_code}       
+						and report_code = ${typeNo_reportCode}       
+						group by r_no))
+			and company_code = ${company_code}     
+			and report_type_code.type_code = <include refid="typeNoFrom"/>.type_code) as "cnt"   
+		from report_type_code
+		where report_type_code.report_code = ${typeNo_reportCode}
+		
+	</select>
+	
+	<!-- 보고서 결재 요청 목록 -->
+	<select id="approvalList" parameterType="com.example.paperless.EmployeeDTO" resultType="java.util.HashMap">
+	
+		select approval.r_no as "r_no"
+			, approval.report_code as "report_code"
+			, report_type.report_name as "report_name"
+			, employee.name as "emp_name"
+			, employee.img as "emp_img"
+			, dept.dept_name as "dept_name"
+			, jikup.jikup_name as "jikup_name"
+			, (select a3.approval_time from approval a3 
+			    where a3.company_code = ${company_code} 
+			    and a3.emp_no = ${emp_no} 
+			    and a3.approval_code = 1
+			    and approval.r_no = a3.r_no
+			    and approval.report_code = a3.report_code) as "approval_time"
+		from approval, report_type, employee, dept, jikup
+		where approval.approval_no in
+		  (select min(a2.approval_no) 
+		  from approval a1, approval a2
+		  where a1.company_code = ${company_code}
+		  and a1.emp_no = ${emp_no}
+		  and a1.approval_code = 1
+		  and a1.report_code = a2.report_code
+		  and a1.r_no = a2.r_no
+		  group by a2.r_no, a2.report_code)
+		and approval.company_code = ${company_code}
+		and report_type.report_code = approval.report_code
+		and employee.emp_no = approval.emp_no
+		and dept.dept_code = employee.dept_code
+		and jikup.jikup_code = employee.jikup_code
+		order by approval.approval_no
+	
+	</select>
+</mapper>

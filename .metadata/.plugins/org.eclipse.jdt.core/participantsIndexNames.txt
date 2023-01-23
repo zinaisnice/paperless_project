@@ -1,0 +1,3 @@
+INDEX VERSION 1.131
+C:\kh_prj\project\paperless_prj\project_230124\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\3003088262.index
+\paperless\src\main\java

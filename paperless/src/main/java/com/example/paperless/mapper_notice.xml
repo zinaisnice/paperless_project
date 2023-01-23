@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- ***************************** -->
+<!-- mapper 태그 선언 -->
+<!-- mapper 태그 안의 namespace 값은 [인터페이스 저장 패키지 경로]와 일치해야 한다. -->
+<!-- ***************************** -->
+<mapper namespace="com.example.paperless.NoticeDAO">
+	
+	<sql id="noticeWhere">
+		1=1
+		
+		<if test="(keyword1 != null and keyword1.length() > 0) or (keyword2 != null and keyword2.length() > 0)"> and (</if>
+		
+		<if test="keyword1 != null and keyword1.length() > 0">
+			(
+				upper(title) like upper('%${keyword1}%')
+				or
+				upper(content) like upper('%${keyword1}%')
+			)
+		</if>
+		
+		<if test="(keyword1 != null and keyword1.length() > 0) and (keyword2 != null and keyword2.length() > 0)"> ${andOr} </if>
+		
+		<if test="keyword2 != null and keyword2.length() > 0">
+			(
+				upper(title) like upper('%${keyword2}%')
+				or
+				upper(content) like upper('%${keyword2}%')
+			)
+		</if>
+		
+		<if test="(keyword1 != null and keyword1.length() > 0) or (keyword2 != null and keyword2.length() > 0)"> ) </if>
+		
+		<if test="date != null">
+			<foreach collection="date" item="xxx" open="and (" close=")" separator=" or ">
+				to_char(sysdate ${xxx}, 'YYYYMMDD') = to_char(reg_date, 'YYYYMMDD')
+			</foreach>
+		</if>		
+		
+	</sql>
+	
+	
+	<!-- noticeList.do -->
+	<!-- 공지사항을 검색하는 select 태그 선언 -->
+	<select id="getNoticeList" parameterType="com.example.paperless.NoticeSearchDTO" resultType="java.util.HashMap">
+		select * from (select rownum "RNUM", xxx.* from (
+			select
+				n.n_no									as "n_no"	
+				, n.title										as "title"
+				, e.name									as "emp_name"
+				, n.readcount									as "readcount"
+				, to_char(n.reg_date,'YYYY-MM-DD HH24:MI:SS')	as "reg_date"
+			from notice n, employee e
+			where <include refid="noticeWhere"/>
+				and n.emp_no = e.emp_no
+				and n.company_code = ${company_code}
+			<if test="sort == null or sort.length() == 0">
+				order by n.n_no desc
+			</if>
+			
+			<if test="sort != null and sort.length() > 0">
+				order by ${sort}
+			</if>
+		
+		<![CDATA[
+			) xxx) where RNUM >= ${begin_rowNo} and RNUM <= ${end_rowNo}
+		]]>
+	</select>
+	
+	<!-- 검색된 공지사항의 총 개수를 구하는 select 태그 선언 -->
+	<select id="getNoticeListTotCnt" parameterType="com.example.paperless.NoticeSearchDTO" resultType="int">
+		select count(*) from notice 
+		where <include refid="noticeWhere"></include>
+			and company_code = ${company_code}
+	</select>
+	
+	<!-- 공지사항의 총 개수를 구하는 select 태그 선언 -->
+	<select id="getNoticeListAllTotCnt" parameterType="com.example.paperless.NoticeSearchDTO" resultType="int">
+		select count(*) from notice where company_code = ${company_code}
+	</select>
+	
+	
+	
+	
+	
+	<!-- noticeRegProc.do -->
+	<!-- 공지사항을 입력하는 insert 태그 선언 -->
+	<insert id="insertNotice" parameterType="com.example.paperless.NoticeDTO">
+	
+		insert into notice(		<!-- title, content 만 입력? xml 수정하기-->
+			n_no
+			, notice_no
+			, company_code
+			, title
+			, emp_no
+			, reg_date
+			, readcount
+			, content
+			, email
+			
+			, group_no
+			, print_no
+			, print_level
+		) values (
+			(select nvl(max(n_no), 0) + 1 from notice)
+			, (select nvl(max(n_no), 0) + 1 from notice where company_code = ${company_code})
+			, ${company_code}
+			, '${title}'
+			, ${emp_no}
+			, to_date(to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+			, 0
+			, '${content}'
+			, '${email}'
+			
+			, (select nvl(max(n_no), 0) + 1 from notice)
+			, 0
+			, 0
+		)
+		
+	</insert>
+	
+	
+		
+	
+	
+	<!-- noticeDetail.do -->
+	<!-- 조회수를 1 증가하고 업데이트한 행의 개수를 얻는 메소드 선언 -->
+	<update id="updateReadcount" parameterType="int">
+		update notice set readcount = readcount + 1 where n_no = ${n_no}
+	</update>
+	
+	<!-- 공지사항 글 1개 검색하는 select 태그 선언 -->
+	<select id="getNotice" parameterType="int" resultType="com.example.paperless.NoticeDTO">
+		select
+			n.n_no											as "n_no"
+			, n.notice_no									as "notice_no"
+			, n.company_code								as "company_code"
+			, n.title										as "title"
+			, e.name										as "emp_name"
+			, to_char(n.reg_date, 'YYYY-MM-DD HH24:MI:SS')	as "reg_date"	<!-- 수정 -->
+			, n.readcount									as "readcount"
+			, n.content										as "content"
+			, n.email										as "email"
+		from notice n, employee e
+		where n.emp_no = e.emp_no 
+			and n.n_no = ${n_no}
+	</select>
+	
+	<!-- 해당 공지사항의 이전 공지사항 -->
+	<select id="getBeforeNotice" parameterType="int" resultType="com.example.paperless.NoticeDTO">
+		select
+			n.n_no										as "n_no"
+			, n.notice_no									as "notice_no"
+			, n.company_code								as "company_code"
+			, n.title										as "title"
+			, e.name										as "emp_name"
+			, to_char(n.reg_date, 'YYYY-MM-DD HH24:MI:SS')	as "reg_date"	<!-- 수정 -->
+			, n.readcount									as "readcount"
+			, n.content										as "content"
+			, n.email										as "email"
+		from notice n, employee e
+		where n.emp_no = e.emp_no 
+			and n.n_no = (
+				select min(n_no) from notice
+				where n_no &gt; ${n_no}
+    				and company_code = (select company_code from notice where n_no = ${n_no}))
+	</select>
+	
+	<!-- 해당 공지사항의 다음 공지사항 -->
+	<select id="getAfterNotice" parameterType="int" resultType="com.example.paperless.NoticeDTO">
+		select
+			n.n_no										as "n_no"
+			, n.notice_no									as "notice_no"
+			, n.company_code								as "company_code"
+			, n.title										as "title"
+			, e.name										as "emp_name"
+			, to_char(n.reg_date, 'YYYY-MM-DD HH24:MI:SS')	as "reg_date"	<!-- 수정 -->
+			, n.readcount									as "readcount"
+			, n.content										as "content"
+			, n.email										as "email"
+		from notice n, employee e
+		where n.emp_no = e.emp_no 
+			and n.n_no = (
+				select max(n_no) from notice
+				where n_no &lt; ${n_no}
+    				and company_code = (select company_code from notice where n_no = ${n_no}))
+	</select>
+	
+	
+	
+	<!-- noticeUpProc.do -->
+	<!-- 삭제/수정할 공지사항의 존재 개수를 리턴하는 select 태그 선언 -->
+	<select id="getNoticeCnt" parameterType="int" resultType="int">
+		select count(*) from notice where n_no = ${n_no}
+	</select>
+	
+	
+	<!-- 공지사항 글 수정하는 update 태그 선언 -->
+	<update id="updateNotice" parameterType="com.example.paperless.NoticeDTO">
+		update notice 
+		set title = '${title}'
+			, content = '${content}'
+		where n_no = ${n_no}
+	</update>
+	
+	
+	<!-- ***************************** -->
+	<!-- 공지사항 글 삭제하는 delete 태그 선언 -->
+	<!-- ***************************** -->
+	<update id="deleteNotice" parameterType="int">
+		delete from notice
+		where n_no = ${n_no}
+	</update>
+	
+	
+	
+	
+	
+	
+	
+
+	
+	
+	
+	<!-- ***************************** -->
+	<!-- [공지사항 글] 내용을 비우는 update 태그 선언 -->
+	<!-- ***************************** -->
+	<!-- <update id="updateNoticeEmpty" parameterType="com.naver.erp.NoticeDTO"> -->
+	<!-- update notice set title = '삭제된 게시물입니다.', content = '삭제된 내용입니다.' -->
+	<!-- where b_no=#{b_no} -->
+	<!-- </update> -->	
+	
+	
+	
+	
+	
+</mapper>

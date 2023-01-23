@@ -1,0 +1,73 @@
+@charset "UTF-8";
+
+.report_table {
+	width: 500px;
+	height: 400px;
+	float: left;
+	border: 1px solid #C3C3C3;
+	margin: 0 20px 50px 20px;
+}
+
+.chart {
+	width: 500px;
+	height: 400px;
+}
+
+.chart_title {
+	width: 500px;
+	height: 50px;
+	margin: 0;
+}
+
+.chart_title_info, .chart_select {
+	width: 200px;
+	height: 50px;
+	display: inline-block;
+	padding: 10px;
+}
+
+.chart_select{
+	width: 290px;
+	text-align: right;
+}
+
+#noApprovalList {
+	width: 500px;
+	height: 350px;
+	text-align: center;
+	padding: 150px 0;
+}
+
+#approval_List{
+	width: 500px;
+	height: 350px;
+	overflow: auto;
+}
+
+.approval_info {
+	margin: 10px 25px;
+	width: 430px;
+	height: 80px;
+	background-color: #E0DAB6;
+	padding: 10px 30px;
+	display: inline-block;
+}
+
+.approval_info_left, .approval_info_right {
+	float: left;
+}
+
+.approval_info_left {
+	width: 70px;
+	height: 80px;
+}
+
+.approval_info img{
+	width: 50px;
+	height: 60px;
+}
+
+.approval_info_right {
+	width: 300px;
+	height: 50px;
+}
